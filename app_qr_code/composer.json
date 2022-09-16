@@ -1,0 +1,8 @@
+{
+    "name": "drupal/app_qr_code_module",
+    "description": "This module required a PHP library to generate the QR code.",
+    "type": "drupal-custom-module",
+    "require": {
+        "endroid/qr-code": "^4.5.0"
+    }
+}

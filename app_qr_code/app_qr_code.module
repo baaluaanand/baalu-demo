@@ -1,0 +1,80 @@
+<?php
+
+/**
+ * @file
+ * Functionality for generating QR code for the App Purchase Links.
+ */
+
+use Drupal\file\Entity\File;
+use Drupal\views\ViewExecutable;
+use Endroid\QrCode\Builder\Builder;
+use Endroid\QrCode\Encoding\Encoding;
+use Endroid\QrCode\ErrorCorrectionLevel\ErrorCorrectionLevelHigh;
+use Endroid\QrCode\Label\Alignment\LabelAlignmentCenter;
+use Endroid\QrCode\Label\Font\NotoSans;
+use Endroid\QrCode\RoundBlockSizeMode\RoundBlockSizeModeMargin;
+use Endroid\QrCode\Writer\PngWriter;
+
+
+// Define public URL.
+define('PUBLIC_URL', 'public://');
+
+ /**
+ * Implements hook_views_post_render().
+ */
+function app_qr_code_views_pre_render(ViewExecutable $view) {
+  if ($view->id() == "product_app_link_view") {
+	$result = $view->result;
+
+	$my_path = file_create_url(PUBLIC_URL);
+	foreach ($result as $i => $row) {
+	  $data = $row->_entity->get('field_product_app_link')->first()->getUrl()->toString();
+	  $id = $row->_entity->nid->getValue()[0]['value'];
+
+	  // Generate the QR code for the app link.
+	  create_qr_code($data, $id);
+
+	  $file_url = $my_path . "qr_code_{$id}.png";
+	  $files = \Drupal::entityTypeManager()
+	    ->getStorage('file')
+        ->loadByProperties(['uri' => $file_url]);
+	  $file = reset($files);
+
+	  // if not create a file
+	  if (!$file) {
+	    $file = File::create([
+          'uri' => $file_url,
+        ]);
+        $file->save();
+	  }
+
+	  $row->_entity->set('field_product_qr_image', [
+	    'target_id' => $file->id(),
+        'alt' => 'APP QR code',
+        'title' => 'APP QR code',
+	  ]);
+	}
+  }
+}
+
+/**
+ * Creates QR code for the APP link using a PHP Lib.
+ */
+function create_qr_code($data, $id) {
+  $wrapper = \Drupal::service('stream_wrapper_manager')->getViaUri(PUBLIC_URL);
+  $realpath_url = $wrapper->realpath(). "/qr_code_{$id}.png";
+
+  $logo_result = Builder::create()
+  	->writer(new PngWriter())
+  	->writerOptions([])
+  	->data($data)
+  	->encoding(new Encoding('UTF-8'))
+  	->errorCorrectionLevel(new ErrorCorrectionLevelHigh())
+  	->size(300)
+  	->margin(10)
+  	->roundBlockSizeMode(new RoundBlockSizeModeMargin())
+  	->build();
+  
+  $logo_result->saveToFile($realpath_url);
+}
+ 
